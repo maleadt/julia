@@ -1066,6 +1066,45 @@ int jl_simulate_longjmp(jl_jmp_buf mctx, bt_context_t *c) JL_NOTSAFEPOINT
     mc->regs[0] = 1;
     assert(mc->sp % 16 == 0);
     return 1;
+    #elif defined(_CPU_RISCV64_)
+    // https://github.com/bminor/glibc/blob/master/sysdeps/riscv/bits/setjmp.h
+    // https://github.com/llvm/llvm-project/blob/7714e0317520207572168388f22012dd9e152e9e/libunwind/src/Registers.hpp -> Registers_riscv
+    // https://github.com/llvm/llvm-project/blob/90149204bd08c07eb672cd5b19d782fed3d96ddc/libunwind/include/libunwind.h
+    mc->__gregs[1] = (*_ctx)->__pc;        // ra
+    mc->__gregs[8] = (*_ctx)->__regs[0];   // s0
+    mc->__gregs[9] = (*_ctx)->__regs[1];   // s1
+    mc->__gregs[18] = (*_ctx)->__regs[2];  // s2
+    mc->__gregs[19] = (*_ctx)->__regs[3];  // s3
+    mc->__gregs[20] = (*_ctx)->__regs[4];  // s4
+    mc->__gregs[21] = (*_ctx)->__regs[5];  // s5
+    mc->__gregs[22] = (*_ctx)->__regs[6];  // s6
+    mc->__gregs[23] = (*_ctx)->__regs[7];  // s7
+    mc->__gregs[24] = (*_ctx)->__regs[8];  // s8
+    mc->__gregs[25] = (*_ctx)->__regs[9];  // s9
+    mc->__gregs[26] = (*_ctx)->__regs[10]; // s10
+    mc->__gregs[27] = (*_ctx)->__regs[11]; // s11
+    mc->__gregs[2] = (*_ctx)->__sp;        // sp
+    #ifndef __riscv_float_abi_soft
+    mc->__fpregs.__q.__f[40] = (*_ctx)->__fpregs[0]; // fs0
+    mc->__fpregs.__q.__f[41] = (*_ctx)->__fpregs[1]; // fs1
+    mc->__fpregs.__q.__f[50] = (*_ctx)->__fpregs[2]; // fs2
+    mc->__fpregs.__q.__f[51] = (*_ctx)->__fpregs[3]; // fs3
+    mc->__fpregs.__q.__f[52] = (*_ctx)->__fpregs[4]; // fs4
+    mc->__fpregs.__q.__f[53] = (*_ctx)->__fpregs[5]; // fs5
+    mc->__fpregs.__q.__f[54] = (*_ctx)->__fpregs[6]; // fs6
+    mc->__fpregs.__q.__f[55] = (*_ctx)->__fpregs[7]; // fs7
+    mc->__fpregs.__q.__f[56] = (*_ctx)->__fpregs[8]; // fs8
+    mc->__fpregs.__q.__f[57] = (*_ctx)->__fpregs[9]; // fs9
+    mc->__fpregs.__q.__f[58] = (*_ctx)->__fpregs[10]; // fs10
+    mc->__fpregs.__q.__f[59] = (*_ctx)->__fpregs[11]; // fs11
+    #endif
+    // ifdef PTR_DEMANGLE ?
+    mc->__gregs[REG_SP] = ptr_demangle(mc->__gregs[REG_SP]);
+    mc->__gregs[REG_RA] = ptr_demangle(mc->__gregs[REG_RA]);
+    mc->__gregs[REG_PC] = mc->__gregs[REG_RA];
+    mc->__gregs[REG_A0] = 1;
+    assert(mc->__gregs[REG_SP] % 16 == 0);
+    return 1;
     #else
     #pragma message("jl_record_backtrace not defined for ASM/SETJMP on unknown linux")
     (void)mc;
