@@ -574,7 +574,17 @@ JL_DLLEXPORT jl_task_t *jl_task_get_next(jl_value_t *trypoptask, jl_value_t *q, 
                         JULIA_DEBUG_SLEEPWAKE( ptls->uv_run_leave = cycleclock() );
                         jl_gc_safepoint();
                     }
+                    // Unlocking may run finalizers, and those can take the iolock
+                    // (e.g. `uvfinalize`). A thread that arms a handle and then
+                    // finds the iolock held relies on its holder to get the loop
+                    // serviced, which we would not do if we went to sleep below.
+                    // Unless the loop is active (and we will retry anyway), leave
+                    // them pending.
+                    if (!active)
+                        ptls->finalizers_inhibited++;
                     JL_UV_UNLOCK();
+                    if (!active)
+                        ptls->finalizers_inhibited--;
                     // optimization: check again first if we may have work to do.
                     // Otherwise we got a spurious wakeup since some other thread
                     // that just wanted to steal libuv from us. We will just go
